@@ -1,0 +1,34 @@
+{
+  "name": "aws-website-cms",
+  "version": "1.0.0",
+  "description": "Gatsby website hosted on AWS with headless Prismic CMS",
+  "author": "Maciej Radzikowski <maciej@radzikowski.com.pl>",
+  "license": "MIT",
+  "scripts": {
+    "ci": "yarn install --frozen-lockfile",
+    "start": "gatsby develop",
+    "clean": "gatsby clean",
+    "build": "gatsby build",
+    "deploy": "serverless deploy",
+    "remove": "serverless remove"
+  },
+  "dependencies": {
+    "axios": "0.22.0",
+    "gatsby": "3.14.2",
+    "gatsby-plugin-image": "1.14.1",
+    "gatsby-source-prismic": "4.2.0",
+    "prismic-reactjs": "1.3.4",
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.83",
+    "serverless": "2.62.0",
+    "serverless-cloudfront-invalidate": "1.11.0",
+    "serverless-esbuild": "1.19.0",
+    "serverless-s3-deploy": "0.10.1",
+    "serverless-s3-remover": "0.6.0",
+    "serverless-scriptable-plugin": "1.2.1",
+    "typescript": "4.4.3"
+  }
+}

@@ -1,0 +1,126 @@
+service: cmswebsite
+
+variablesResolutionMode: 20210326
+
+plugins:
+  - serverless-esbuild
+  - serverless-s3-deploy
+  - serverless-s3-remover
+  - serverless-scriptable-plugin
+  - serverless-cloudfront-invalidate
+
+custom:
+  baseName: ${self:service}-${self:provider.stage}
+
+  esbuild:
+    target: node14
+    minify: true
+    sourcemap: true
+
+  scriptHooks:
+    after:aws:deploy:deploy:updateStack:
+      - yarn run clean
+      - yarn run build
+
+  assets:
+    auto: true
+    targets:
+      - bucket: !Ref WebsiteBucket
+        empty: true
+        files:
+          - source: public
+            globs: '**/*'
+
+  remover:
+    buckets:
+      - ${cf:${self:custom.baseName}.WebsiteBucketName, ''}
+
+  cloudfrontInvalidate:
+    - distributionIdKey: WebsiteDistributionId
+      items:
+        - "/*"
+
+provider:
+  name: aws
+  region: eu-west-1
+  stage: ${opt:stage, 'dev'}
+  deploymentBucket:
+    blockPublicAccess: true
+  disableDefaultOutputExportNames: true
+  runtime: nodejs14.x
+  memorySize: 256
+  timeout: 15
+  versionFunctions: false
+  logRetentionInDays: 30
+
+functions:
+  githubTrigger:
+    name: ${self:custom.baseName}-githubTrigger
+    handler: aws/githubTrigger.handler
+    events:
+      - httpApi: POST /update
+    environment:
+      PRISMIC_SECRET: ${ssm:/${self:service}/${self:provider.stage}/prismicSecret}
+      GITHUB_USER: ${ssm:/${self:service}/${self:provider.stage}/github/user}
+      GITHUB_REPO: ${ssm:/${self:service}/${self:provider.stage}/github/repo}
+      GITHUB_TOKEN: ${ssm:/${self:service}/${self:provider.stage}/github/token}
+
+resources:
+  Resources:
+
+    # S3
+
+    WebsiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        WebsiteConfiguration:
+          IndexDocument: index.html
+
+    WebsiteBucketAccessPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref WebsiteBucket
+        PolicyDocument:
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: !Sub ${WebsiteBucket.Arn}/*
+              Principal: '*'
+
+    # CLOUDFRONT
+
+    WebsiteDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Comment: ${self:custom.baseName}
+          PriceClass: PriceClass_100
+          HttpVersion: http2
+          Origins:
+            - Id: websiteS3
+              DomainName: !Select [ 2, !Split [ '/', !GetAtt 'WebsiteBucket.WebsiteURL' ] ]
+              CustomOriginConfig:
+                OriginProtocolPolicy: http-only
+          DefaultCacheBehavior:
+            TargetOriginId: websiteS3
+            AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            ViewerProtocolPolicy: redirect-to-https
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+
+  Outputs:
+
+    WebsiteBucketName:
+      Value: !Ref WebsiteBucket
+
+    WebsiteDistributionId:
+      Value: !Ref WebsiteDistribution

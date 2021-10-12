@@ -1,0 +1,8 @@
+.idea/
+
+node_modules/
+.serverless/
+.cache/
+public/
+
+.env
